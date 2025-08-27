@@ -49,8 +49,8 @@ export async function POST(request) {
 
     // Ожидаем результата (polling)
     let result = null;
-    for (let i = 0; i < 40; i++) {
-      await new Promise(r => setTimeout(r, 5000));
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 3000));
       const st = await fetch(`https://api-key.fusionbrain.ai/key/api/v1/pipeline/status/${uuid}`, { headers: AUTH_HEADERS });
       const stData = await st.json().catch(() => null);
       if (stData?.images?.length) {
