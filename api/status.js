@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import FormData from 'form-data';
 
 export default async function handler(req, res) {
   const { uuid } = req.query;
@@ -8,8 +9,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Запрос к FusionBrain API (получение статуса)
-    const response = await fetch(`https://api-key.fusionbrain.ai/key/api/v1/text2image/status/${uuid}`, {
+    // Запрос статуса в FusionBrain API
+    const fbResponse = await fetch(`https://api-key.fusionbrain.ai/key/api/v1/text2image/status/${uuid}`, {
       method: 'GET',
       headers: {
         'X-Key': `Key ${process.env.FB_KEY}`,
@@ -17,21 +18,19 @@ export default async function handler(req, res) {
       }
     });
 
-    const data = await response.json();
+    const data = await fbResponse.json();
 
-    // Если картинка готова, вернём ссылку (base64 -> CDN)
     if (data.status === 'DONE' && data.images?.length > 0) {
       const base64Image = data.images[0];
-      const imageBuffer = Buffer.from(base64Image, 'base64');
+      const buffer = Buffer.from(base64Image, 'base64');
 
-      // Загружаем на tmpfiles.org (временный CDN)
+      // Готовим форму для tmpfiles.org
+      const form = new FormData();
+      form.append('file', buffer, { filename: 'image.png' });
+
       const uploadResp = await fetch('https://tmpfiles.org/api/v1/upload', {
         method: 'POST',
-        body: (() => {
-          const formData = new FormData();
-          formData.append('file', new Blob([imageBuffer]), 'image.png');
-          return formData;
-        })()
+        body: form
       });
       const uploadData = await uploadResp.json();
 
@@ -42,11 +41,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // Если не готово — просто вернём статус
     return res.status(200).json({ status: data.status, uuid });
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to check status' });
+  } catch (err) {
+    console.error('Status check error:', err);
+    return res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 }
